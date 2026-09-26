@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Queue — Deskline{% endblock %}
+{% block content %}
+    <div class="page-head">
+        <h1>Ticket queue</h1>
+        <span class="live-indicator" id="live-indicator"><span class="live-dot"></span> Live</span>
+    </div>
+
+    <div class="filter-bar">
+        <button class="filter-chip active" data-filter="all">All</button>
+        <button class="filter-chip" data-filter="open">Open</button>
+        <button class="filter-chip" data-filter="in_progress">In progress</button>
+        <button class="filter-chip" data-filter="resolved">Resolved</button>
+    </div>
+
+    <ul class="ticket-list" id="ticket-list">
+        {% for t in tickets %}
+            <li class="ticket-row" data-status="{{ t.status }}" data-id="{{ t.id }}">
+                <a href="{{ url_for('tickets.view_ticket', ticket_id=t.id) }}" class="ticket-link">
+                    <span class="ticket-subject">{{ t.subject }}</span>
+                    <span class="ticket-sub">from {{ t.customer.name }}</span>
+                    <span class="ticket-meta">
+                        <span class="pill pill-priority-{{ t.priority }}">{{ t.priority }}</span>
+                        <span class="pill pill-status-{{ t.status }}">{{ t.status.replace('_', ' ') }}</span>
+                        {% if t.assigned_agent %}<span class="ticket-sub">→ {{ t.assigned_agent.name }}</span>{% endif %}
+                    </span>
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+    {% if not tickets %}
+        <div class="empty-state" id="empty-state"><p>No tickets in the queue.</p></div>
+    {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+const socket = io();
+const list = document.getElementById('ticket-list');
+const emptyState = document.getElementById('empty-state');
+
+function priorityLabel(p) { return p; }
+function statusLabel(s) { return s.replace('_', ' '); }
+
+function renderRow(ticket) {
+    const li = document.createElement('li');
+    li.className = 'ticket-row ticket-row-new';
+    li.dataset.status = ticket.status;
+    li.dataset.id = ticket.id;
+    li.innerHTML = `
+        <a href="/tickets/${ticket.id}" class="ticket-link">
+            <span class="ticket-subject">${ticket.subject}</span>
+            <span class="ticket-sub">from ${ticket.customer}</span>
+            <span class="ticket-meta">
+                <span class="pill pill-priority-${ticket.priority}">${priorityLabel(ticket.priority)}</span>
+                <span class="pill pill-status-${ticket.status}">${statusLabel(ticket.status)}</span>
+                ${ticket.agent ? `<span class="ticket-sub">→ ${ticket.agent}</span>` : ''}
+            </span>
+        </a>`;
+    return li;
+}
+
+socket.on('new_ticket', (ticket) => {
+    if (emptyState) emptyState.remove();
+    list.prepend(renderRow(ticket));
+    playPulse();
+});
+
+socket.on('ticket_activity', (ticket) => {
+    const existing = list.querySelector(`[data-id="${ticket.id}"]`);
+    const fresh = renderRow(ticket);
+    if (existing) {
+        existing.replaceWith(fresh);
+    } else {
+        if (emptyState) emptyState.remove();
+        list.prepend(fresh);
+    }
+});
+
+function playPulse() {
+    const dot = document.querySelector('.live-dot');
+    dot.classList.add('pulse');
+    setTimeout(() => dot.classList.remove('pulse'), 600);
+}
+
+document.querySelectorAll('.filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        const filter = chip.dataset.filter;
+        document.querySelectorAll('.ticket-row').forEach(row => {
+            row.style.display = (filter === 'all' || row.dataset.status === filter) ? '' : 'none';
+        });
+    });
+});
+</script>
+{% endblock %}

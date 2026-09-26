@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}My tickets — Deskline{% endblock %}
+{% block content %}
+    <div class="page-head">
+        <h1>My tickets</h1>
+        <a href="{{ url_for('tickets.new_ticket') }}" class="btn btn-primary">New ticket</a>
+    </div>
+
+    {% if tickets %}
+        <ul class="ticket-list">
+            {% for t in tickets %}
+                <li class="ticket-row">
+                    <a href="{{ url_for('tickets.view_ticket', ticket_id=t.id) }}" class="ticket-link">
+                        <span class="ticket-subject">{{ t.subject }}</span>
+                        <span class="ticket-meta">
+                            <span class="pill pill-priority-{{ t.priority }}">{{ t.priority }}</span>
+                            <span class="pill pill-status-{{ t.status }}">{{ t.status.replace('_', ' ') }}</span>
+                        </span>
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <div class="empty-state">
+            <p>No tickets yet. <a href="{{ url_for('tickets.new_ticket') }}">Submit one</a> and we'll help you out.</p>
+        </div>
+    {% endif %}
+{% endblock %}

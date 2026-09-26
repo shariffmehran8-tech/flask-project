@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}#{{ ticket.id }} {{ ticket.subject }} — Deskline{% endblock %}
+{% block content %}
+    <p><a href="{{ url_for('dashboard.home') }}">&larr; Back</a></p>
+
+    <div class="ticket-detail-layout">
+        <div>
+            <div class="ticket-header">
+                <h1>{{ ticket.subject }}</h1>
+                <div class="ticket-meta">
+                    <span class="pill pill-priority-{{ ticket.priority }}">{{ ticket.priority }}</span>
+                    <span class="pill pill-status-{{ ticket.status }}" id="status-pill">{{ ticket.status.replace('_', ' ') }}</span>
+                </div>
+            </div>
+            <p class="muted">Opened by {{ ticket.customer.name }} on {{ ticket.created_at.strftime('%b %d, %Y %H:%M') }}</p>
+
+            <div class="thread" id="thread">
+                {% for m in ticket.messages %}
+                    <div class="thread-msg {% if m.is_agent %}thread-msg-agent{% endif %}" data-id="{{ m.id }}">
+                        <div class="thread-msg-head">
+                            <strong>{{ m.author.name }}</strong>
+                            <span class="muted">{{ m.created_at.strftime('%H:%M') }}</span>
+                        </div>
+                        <p>{{ m.body }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <form method="post" action="{{ url_for('tickets.post_message', ticket_id=ticket.id) }}" class="reply-form">
+                <textarea name="body" rows="3" placeholder="Write a reply…" required></textarea>
+                <button type="submit" class="btn btn-primary">Send</button>
+            </form>
+        </div>
+
+        {% if current_user.is_agent %}
+            <aside class="sidebar-card">
+                <h3>Manage ticket</h3>
+                <form method="post" action="{{ url_for('tickets.update_ticket', ticket_id=ticket.id) }}">
+                    <div class="field">
+                        <label for="status">Status</label>
+                        <select id="status" name="status">
+                            {% for s in statuses %}
+                                <option value="{{ s }}" {% if s == ticket.status %}selected{% endif %}>{{ s.replace('_', ' ')|capitalize }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="assigned_agent_id">Assigned to</label>
+                        <select id="assigned_agent_id" name="assigned_agent_id">
+                            <option value="unassigned" {% if not ticket.assigned_agent_id %}selected{% endif %}>Unassigned</option>
+                            {% for a in agents %}
+                                <option value="{{ a.id }}" {% if ticket.assigned_agent_id == a.id %}selected{% endif %}>{{ a.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-full">Update</button>
+                </form>
+            </aside>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const socket = io();
+const ticketId = {{ ticket.id }};
+const thread = document.getElementById('thread');
+const statusPill = document.getElementById('status-pill');
+
+socket.emit('join_ticket', { ticket_id: ticketId });
+
+socket.on('new_message', (msg) => {
+    if (msg.ticket_id !== ticketId) return;
+    if (thread.querySelector(`[data-id="${msg.id}"]`)) return;
+    const div = document.createElement('div');
+    div.className = 'thread-msg' + (msg.is_agent ? ' thread-msg-agent' : '');
+    div.dataset.id = msg.id;
+    div.innerHTML = `<div class="thread-msg-head"><strong>${msg.author}</strong> <span class="muted">${msg.created_at}</span></div><p>${msg.body}</p>`;
+    thread.appendChild(div);
+    thread.scrollTop = thread.scrollHeight;
+});
+
+socket.on('ticket_updated', (ticket) => {
+    if (ticket.id !== ticketId) return;
+    statusPill.textContent = ticket.status.replace('_', ' ');
+    statusPill.className = 'pill pill-status-' + ticket.status;
+});
+
+window.addEventListener('beforeunload', () => {
+    socket.emit('leave_ticket', { ticket_id: ticketId });
+});
+</script>
+{% endblock %}

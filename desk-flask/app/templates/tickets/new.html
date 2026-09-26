@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}New ticket — Deskline{% endblock %}
+{% block content %}
+    <div class="form-card">
+        <h1>Submit a ticket</h1>
+        <p class="muted">Tell us what's going on — an agent will pick it up live.</p>
+        <form method="post">
+            <div class="field">
+                <label for="subject">Subject</label>
+                <input type="text" id="subject" name="subject" required placeholder="Brief summary of the issue">
+            </div>
+            <div class="field">
+                <label for="priority">Priority</label>
+                <select id="priority" name="priority">
+                    {% for p in priorities %}
+                        <option value="{{ p }}" {% if p == 'normal' %}selected{% endif %}>{{ p|capitalize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="description">Description</label>
+                <textarea id="description" name="description" rows="6" required placeholder="What happened? Steps to reproduce, error messages, anything that helps."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Submit ticket</button>
+        </form>
+    </div>
+{% endblock %}
